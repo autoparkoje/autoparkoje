@@ -1,22 +1,19 @@
-# Parkimi Inteligjent: serveri
+# Parkimi (cloud)
 
-## Nisja
+Rezervim dhe parkim përmes QR kodit. Hapur 09:00–23:00, çdo rezervim 15 min – 3 orë.
+
+## Nisja lokale
     npm install
-    PARKIMI_KEY=një-fjalëkalim-i-gjatë npm start
+    ADMIN_KEY=një-fjalëkalim-i-gjatë SEED_DEMO=1 npm start
+Hap http://localhost:3000 (SEED_DEMO shton disa makina shembull; hiqe në prodhim).
 
-Hap http://localhost:3000. Baza është skedari `parkimi.db` (SQLite), krijohet vetë.
+## Docker
+    docker build -t parkimi .
+    docker run -d -p 3000:3000 -e ADMIN_KEY=... -v parkimi-data:/data parkimi
 
-## Kompjuteri me Arduino
-1. Hap faqen nga serveri (në Chrome/Edge). Te "Çelësi i serverit" ngjit `PARKIMI_KEY`.
-2. Kliko "Lidh USB". Gjendja e vendeve dërgohet te serveri vetë.
+## Cloud
+Duhet host me disk të përhershëm për SQLite (Fly.io me volume, VPS, etj.) dhe HTTPS.
+Vetëm 1 kopje e serverit. Variablat: ADMIN_KEY, TZ (parazgjedhja Europe/Belgrade), DB_FILE, PORT.
 
-## Telefonat
-Hapin linkun e serverit (ose skanojnë QR). Te "Linku publik" vendos adresën publike të serverit, pastaj printo QR-të.
-
-## Hosting
-Duhet një host me disk të përhershëm: VPS, Fly.io me volume, ose Raspberry Pi në parking
-(me Cloudflare Tunnel për HTTPS). Hostet me disk të përkohshëm e humbasin `parkimi.db`.
-Ndrysho `DB_FILE` nëse e do skedarin diku tjetër.
-
-## Kufizime
-Hyrja është vetëm emër + targë, pa fjalëkalim. Emrat shfaqen te të gjithë, targat jo.
+## Faqet
+- `/` harta dhe rezervimi · `/#print` QR kodet për printim · `/#admin` regjistri (emër, telefon, vend, orar)

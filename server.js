@@ -1,80 +1,92 @@
+process.env.TZ = process.env.TZ || "Europe/Belgrade";
 const express = require("express"), Database = require("better-sqlite3"), crypto = require("crypto"), path = require("path");
-const KEY = process.env.PARKIMI_KEY || "ndrysho-kete", PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000, ADMIN = process.env.ADMIN_KEY || "";
+const OPEN = 9, CLOSE = 23, MIN = 15, MAX = 180, STEP = MIN * 60000;
+const ids = (p, n) => Array.from({ length: n }, (_, i) => `${p}-P${i + 1}`);
+const SPOTS = [...ids("A", 10), ...ids("B", 12)];
+const VEH = ["mercedes", "vw", "bmw", "audi", "porsche", "kamion", "tjeter"];
+
 const db = new Database(process.env.DB_FILE || "parkimi.db");
 db.pragma("journal_mode = WAL");
-db.exec(`
-CREATE TABLE IF NOT EXISTS users(token TEXT PRIMARY KEY, name TEXT NOT NULL, plate TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS spots(key TEXT PRIMARY KEY, status TEXT NOT NULL, cm REAL, updated INTEGER);
-CREATE TABLE IF NOT EXISTS reservations(key TEXT PRIMARY KEY, token TEXT, name TEXT, plate TEXT, start INTEGER, t_end INTEGER);
-CREATE TABLE IF NOT EXISTS sessions(id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT, name TEXT, plate TEXT, start INTEGER, until INTEGER, t_end INTEGER);
-`);
-const now = () => Date.now(), SPOT = /^[A-Z]-P\d+$/;
-const q = s => db.prepare(s);
-const upSpot = q("INSERT INTO spots(key,status,cm,updated) VALUES(?,?,?,?) ON CONFLICT(key) DO UPDATE SET status=excluded.status,cm=excluded.cm,updated=excluded.updated");
-const getSpot = q("SELECT status FROM spots WHERE key=?"), getRes = q("SELECT * FROM reservations WHERE key=?");
-const openSess = q("SELECT id FROM sessions WHERE key=? AND t_end IS NULL");
-const expire = () => q("DELETE FROM reservations WHERE t_end<=?").run(now());
+db.exec(`CREATE TABLE IF NOT EXISTS bookings(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, spot TEXT NOT NULL, name TEXT NOT NULL, phone TEXT NOT NULL, vehicle TEXT,
+  start_at INTEGER NOT NULL, end_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'ok', code TEXT NOT NULL, created_at INTEGER NOT NULL);
+  CREATE INDEX IF NOT EXISTS ix_spot ON bookings(spot, start_at, end_at);`);
 
-const apply = db.transaction(list => {
-  for (const s of list) {
-    if (!SPOT.test(s.key) || !["free", "occupied", "unknown"].includes(s.status)) continue;
-    upSpot.run(s.key, s.status, typeof s.cm === "number" ? s.cm : null, now());
-    const open = openSess.get(s.key);
-    if (s.status === "occupied" && !open) {
-      const r = getRes.get(s.key);
-      q("INSERT INTO sessions(key,name,plate,start,until) VALUES(?,?,?,?,?)").run(s.key, r ? r.name : "Vizitor", r ? r.plate : "-", now(), r ? r.t_end : null);
-      if (r) q("DELETE FROM reservations WHERE key=?").run(s.key);
-    } else if (open && s.status === "free") q("UPDATE sessions SET t_end=? WHERE id=?").run(now(), open.id);
-  }
-});
+const dayWindow = t => { const o = new Date(t), c = new Date(t); o.setHours(OPEN, 0, 0, 0); c.setHours(CLOSE, 0, 0, 0); return [o.getTime(), c.getTime()]; };
+const mask = n => { const p = n.split(" "); return p.length > 1 ? p[0] + " " + p[p.length - 1][0].toUpperCase() + "." : p[0]; };
+const eq = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 
-const userOf = req => q("SELECT * FROM users WHERE token=?").get((req.headers.authorization || "").replace("Bearer ", ""));
-const auth = (req, res, next) => { const u = userOf(req); if (!u) return res.status(401).json({ error: "Hyr së pari" }); req.user = u; next(); };
+if (process.env.SEED_DEMO && !db.prepare("SELECT 1 FROM bookings").get()) {
+  const t = Date.now(), ins = db.prepare("INSERT INTO bookings(spot,name,phone,vehicle,start_at,end_at,code,created_at) VALUES(?,?,?,?,?,?,?,?)");
+  [["A-P1", "Arben Krasniqi", "mercedes", 20, 90], ["A-P3", "Elira Berisha", "vw", 5, 45], ["A-P7", "Besnik Gashi", "bmw", 40, 120],
+   ["A-P9", "Drita Hoxha", "audi", 10, 60], ["B-P2", "Liridon Morina", "porsche", 15, 150], ["B-P5", "Faton Rama", "kamion", 30, 170],
+   ["B-P8", "Vlora Shala", "vw", -30, 40]].forEach(([s, n, v, a, m]) => ins.run(s, n, "+38349000000", v, t - a * 6e4, t - a * 6e4 + m * 6e4, "demo", t));
+}
 
 const app = express();
-app.use(express.json({ limit: "20kb" }));
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
+app.use(express.json({ limit: "10kb" }));
+app.use((q, r, n) => { r.set("X-Content-Type-Options", "nosniff"); n(); });
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/api/state", (req, res) => {
-  expire();
-  const me = userOf(req), spots = {};
-  for (const s of q("SELECT key,status,cm FROM spots").all()) spots[s.key] = { status: s.status, cm: s.cm };
-  res.json({
-    spots,
-    res: q("SELECT key,name,token,start,t_end FROM reservations").all().map(r => ({ key: r.key, name: r.name, start: r.start, end: r.t_end, mine: !!me && r.token === me.token })),
-    sessions: q("SELECT key,name,start,until,t_end FROM (SELECT * FROM sessions ORDER BY id DESC LIMIT 100) ORDER BY id").all().map(s => ({ key: s.key, name: s.name, start: s.start, until: s.until, end: s.t_end }))
-  });
+  const t = Date.now(), [o, c] = dayWindow(t), spots = {};
+  for (const k of SPOTS) spots[k] = { status: "free", slots: [] };
+  const rows = db.prepare("SELECT id,spot,name,vehicle,start_at,end_at FROM bookings WHERE status!='cancelled' AND end_at>? ORDER BY start_at").all(t);
+  for (const b of rows) {
+    const s = spots[b.spot]; if (!s) continue;
+    const info = { vehicle: b.vehicle, name: mask(b.name), start: b.start_at, end: b.end_at };
+    s.slots.push({ id: b.id, s: b.start_at, e: b.end_at, v: b.vehicle, n: info.name });
+    if (b.start_at <= t && s.status !== "occupied") Object.assign(s, { status: "occupied" }, info);
+    else if (b.start_at > t && s.status === "free") Object.assign(s, { status: "reserved" }, info);
+  }
+  res.json({ now: t, open: o, close: c, tz: process.env.TZ, min: MIN, max: MAX, spots });
 });
 
-app.post("/api/sensor", (req, res) => {
-  if (req.headers["x-api-key"] !== KEY) return res.status(401).json({ error: "Çelës i gabuar" });
-  const list = Array.isArray(req.body.spots) ? req.body.spots.slice(0, 100) : [];
-  apply(list); res.json({ ok: true });
+const hits = new Map();
+app.post("/api/book", (req, res) => {
+  const t = Date.now(), bad = (m, c = 400) => res.status(c).json({ error: m });
+  const h = (hits.get(req.ip) || []).filter(x => t - x < 36e5);
+  if (h.length >= 8) return bad("Shumë kërkesa. Provo më vonë.", 429);
+  const { spot, vehicle, minutes } = req.body;
+  let start = Number(req.body.start);
+  const name = String(req.body.name || "").trim().replace(/\s+/g, " "), phone = String(req.body.phone || "").replace(/\s/g, "");
+  if (!SPOTS.includes(spot)) return bad("Vend i pavlefshëm");
+  if (name.length < 2 || name.length > 40) return bad("Shkruaj emrin dhe mbiemrin");
+  if (!/^\+?[0-9]{8,15}$/.test(phone)) return bad("Numër telefoni i pavlefshëm");
+  if (!Number.isInteger(minutes) || minutes < MIN || minutes > MAX || minutes % MIN) return bad(`Kohëzgjatja duhet të jetë ${MIN}–${MAX} minuta`);
+  if (!Number.isFinite(start) || start < t - 120000 || start > t + 864e5) return bad("Orë fillimi e pavlefshme");
+  if (start < t) start = t;
+  const [o, c] = dayWindow(start), end = start + minutes * 60000;
+  if (start > t + 60000 && (start - o) % STEP) return bad("Ora duhet të jetë në hapa 15 minutash");
+  if (start < o || end > c) return bad(`Parkingu është i hapur ${OPEN}:00–${CLOSE}:00`);
+  if (db.prepare("SELECT 1 FROM bookings WHERE spot=? AND status!='cancelled' AND start_at<? AND end_at>? LIMIT 1").get(spot, end, start)) return bad("Vendi është i zënë në këtë orar", 409);
+  if (db.prepare("SELECT COUNT(*) n FROM bookings WHERE phone=? AND status!='cancelled' AND end_at>?").get(phone, t).n >= 2) return bad("Ke tashmë 2 rezervime aktive", 409);
+  const code = crypto.randomBytes(9).toString("base64url");
+  const id = db.prepare("INSERT INTO bookings(spot,name,phone,vehicle,start_at,end_at,code,created_at) VALUES(?,?,?,?,?,?,?,?)")
+    .run(spot, name, phone, VEH.includes(vehicle) ? vehicle : "tjeter", start, end, code, t).lastInsertRowid;
+  h.push(t); hits.set(req.ip, h);
+  res.json({ id, code, start, end });
 });
 
-app.post("/api/login", (req, res) => {
-  const name = String(req.body.name || "").trim().slice(0, 30), plate = String(req.body.plate || "").trim().toUpperCase();
-  if (!name || !/^[A-Z0-9-]{3,12}$/.test(plate)) return res.status(400).json({ error: "Emër ose targë e pavlefshme" });
-  const token = crypto.randomUUID();
-  q("INSERT INTO users(token,name,plate) VALUES(?,?,?)").run(token, name, plate);
-  res.json({ token });
-});
-
-app.post("/api/reserve", auth, (req, res) => {
-  const { key, end } = req.body, t = now();
-  if (!SPOT.test(String(key)) || !(end > t) || end > t + 48 * 36e5) return res.status(400).json({ error: "Orë e pavlefshme" });
-  expire();
-  const s = getSpot.get(key);
-  if (s && s.status === "occupied") return res.status(409).json({ error: "Vendi është i zënë" });
-  if (getRes.get(key)) return res.status(409).json({ error: "Vendi është tashmë i rezervuar" });
-  q("DELETE FROM reservations WHERE token=?").run(req.user.token);
-  q("INSERT INTO reservations(key,token,name,plate,start,t_end) VALUES(?,?,?,?,?,?)").run(key, req.user.token, req.user.name, req.user.plate, t, end);
+app.post("/api/booking/:id/end", (req, res) => {
+  const b = db.prepare("SELECT * FROM bookings WHERE id=?").get(req.params.id), t = Date.now();
+  if (!b || !eq(b.code, req.body.code || "")) return res.status(403).json({ error: "Nuk lejohet" });
+  if (b.status === "ok" && b.end_at > t) {
+    if (b.start_at > t) db.prepare("UPDATE bookings SET status='cancelled' WHERE id=?").run(b.id);
+    else db.prepare("UPDATE bookings SET status='ended', end_at=? WHERE id=?").run(t, b.id);
+  }
   res.json({ ok: true });
 });
 
-app.delete("/api/reserve/:key", auth, (req, res) => {
-  q("DELETE FROM reservations WHERE key=? AND token=?").run(req.params.key, req.user.token);
-  res.json({ ok: true });
-});
+const adm = (req, res, next) => {
+  if (!ADMIN) return res.status(503).json({ error: "ADMIN_KEY nuk është vendosur" });
+  if (!eq(req.headers["x-admin-key"] || "", ADMIN)) return res.status(401).json({ error: "Çelës i gabuar" });
+  next();
+};
+app.get("/api/admin/bookings", adm, (req, res) =>
+  res.json({ tz: process.env.TZ, rows: db.prepare("SELECT id,spot,name,phone,vehicle,start_at,end_at,status,created_at FROM bookings ORDER BY id DESC LIMIT 1000").all() }));
 
-app.listen(PORT, () => console.log(`Parkimi në http://localhost:${PORT}` + (KEY === "ndrysho-kete" ? "  (ndrysho PARKIMI_KEY!)" : "")));
+app.listen(PORT, () => console.log(`Parkimi në http://localhost:${PORT}  (${process.env.TZ})`));
