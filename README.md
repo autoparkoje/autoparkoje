@@ -251,6 +251,6 @@ Projekti shpërndahet nën licencën **MIT**. Shiko skedarin [`LICENSE`](LICENSE
 
 <div align="center">
 
-Realizuar me ❤️ nga ekipi i moduleve STC dhe SEW • 2026–2027
+Realizuar me  nga ekipi i moduleve STC dhe SEW • 2026–2027
 
 </div>
