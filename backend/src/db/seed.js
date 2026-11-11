@@ -33,6 +33,30 @@ function seedBridgeKey(db, rawKey) {
   return { created: true, name, key: rawKey ? null : key };
 }
 
+// Seed-i i nisjes së serverit (idempotent, pa sekrete në logje).
+// Në prodhim (p.sh. Render pa disk të qëndrueshëm) databaza mund të jetë
+// e re në çdo deploy — prandaj admini duhet krijuar në çdo nisje nëse mungon.
+// Çelësi API regjistrohet këtu VETËM kur jepet nga env (BRIDGE_API_KEY);
+// gjenerimi automatik mbetet te "npm run seed" / CMD i Docker-it.
+function bootstrap(db, config) {
+  const admin = seedAdmin(db, {
+    username: config.adminUsername,
+    password: config.adminPassword,
+  });
+  console.log(
+    admin.created ? `✔ U krijua admini fillestar "${admin.username}"` : `• Admin: ${admin.reason}`
+  );
+  if (config.bridgeApiKey) {
+    const bridge = seedBridgeKey(db, config.bridgeApiKey);
+    console.log(
+      bridge.created
+        ? "✔ Çelësi API i urës u regjistrua nga BRIDGE_API_KEY"
+        : `• Çelësi API: ${bridge.reason}`
+    );
+  }
+  return admin;
+}
+
 if (require.main === module) {
   const db = createDb(config.dbPath);
   const admin = seedAdmin(db, {
@@ -52,4 +76,4 @@ if (require.main === module) {
   db.close();
 }
 
-module.exports = { seedAdmin, seedBridgeKey };
+module.exports = { seedAdmin, seedBridgeKey, bootstrap };

@@ -2,8 +2,14 @@
 
 const config = require("./config");
 const { createApp } = require("./app");
+const { bootstrap } = require("./db/seed");
 
 const app = createApp({ config });
+
+// Seed-i në nisje (idempotent): siguron që admini fillestar ekziston edhe kur
+// databaza është krijuar rishtas (p.sh. deploy në Render pa disk të qëndrueshëm),
+// ku "npm run seed" nuk ekzekutohet kurrë. Nuk shkruan asnjë sekret në logje.
+bootstrap(app.locals.db, config);
 
 const server = app.listen(config.port, () => {
   console.log(`✔ Parkimi backend: http://localhost:${config.port}`);

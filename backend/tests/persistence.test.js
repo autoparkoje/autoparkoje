@@ -106,3 +106,27 @@ test("login-i bllokohet me 429 pas shumë përpjekjeve të dështuara", async ()
     srv.close();
   }
 });
+
+test("bootstrap në nisje krijon adminin në databazë të re, por s'prek ekzistuesin", () => {
+  const { bootstrap } = require("../src/db/seed");
+  const { createDb } = require("../src/db");
+
+  // Databazë e re (si deploy i freskët në Render): admini krijohet nga env
+  const db = createDb(":memory:");
+  const first = bootstrap(db, { adminUsername: "emirdaku", adminPassword: "sekret-i-forte" });
+  assert.equal(first.created, true);
+
+  // Nisja e dytë (restart): nuk krijohet llogari e dytë dhe s'preket ekzistuesja
+  const hashBefore = db.prepare("SELECT password_hash FROM admin_users").get().password_hash;
+  const second = bootstrap(db, { adminUsername: "tjeter", adminPassword: "tjeter-fjalekalim" });
+  assert.equal(second.created, false);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM admin_users").get().n, 1);
+  assert.equal(db.prepare("SELECT password_hash FROM admin_users").get().password_hash, hashBefore);
+
+  // Pa kredenciale në env: asgjë nuk krijohet, asnjë gabim
+  const empty = createDb(":memory:");
+  const none = bootstrap(empty, { adminUsername: "", adminPassword: "" });
+  assert.equal(none.created, false);
+  assert.equal(empty.prepare("SELECT COUNT(*) AS n FROM admin_users").get().n, 0);
+  db.close(); empty.close();
+});
