@@ -165,7 +165,7 @@ Parametrat fillestarë për testim:
 
 ### Kërkesat
 - [Arduino IDE](https://www.arduino.cc/en/software) (ose PlatformIO)
-- [Node.js](https://nodejs.org/) 18+
+- [Docker](https://www.docker.com/) + Docker Compose **ose** [Node.js](https://nodejs.org/) 20+
 - Shfletues i bazuar në Chromium (Chrome / Edge) për **Web Serial API**
 
 ### 1. Klono repo-n
@@ -179,7 +179,37 @@ cd <Projketi-Sistemi-i-parkimit>
 2. Zgjidh **Board: Arduino Uno** dhe portën e duhur.
 3. Ngarko (Upload) kodin dhe hap Serial Monitor në **9600 baud** për kontroll.
 
-### 3. Nis backend-in
+### 3a. Nisja me Docker (e rekomanduar)
+
+I gjithë sistemi (backend + frontend + databaza) niset me një komandë të vetme:
+
+```bash
+cp .env.example .env      # vendos ADMIN_PASSWORD (e detyrueshme) etj.
+docker compose up -d --build
+docker compose logs backend   # çelësi API i urës shfaqet VETËM një herë këtu — ruaje!
+```
+
+- Aplikacioni: `http://localhost:3000` (porta ndryshohet me `PORT` në `.env`)
+- Ndalja: `docker compose down` — **të dhënat RUHEN** në volumin `parking_data`
+- ⚠️ **MOS** përdor `docker compose down -v` në operim normal — kjo **fshin databazën**!
+
+**Arkitektura Docker:** një shërbim i vetëm — backend-i Node (imazh `node:22-slim`,
+përdorues pa privilegje, healthcheck në `/api/health`, `restart: unless-stopped`)
+shërben edhe frontend-in statik dhe mban databazën SQLite në volumin e qëndrueshëm
+`parking_data` (`/data/parking.db`). Ura e Arduino-s punon në shfletuesin e operatorit
+(Web Serial), prandaj kontejneri s'ka nevojë për qasje USB. Inicializimi i databazës
+dhe seed-i (admini + çelësi API) ekzekutohen automatikisht në nisje dhe janë idempotentë.
+
+| Variabla (.env) | Default | Përshkrimi |
+|---|---|---|
+| `PORT` | `3000` | Porta në host |
+| `ADMIN_USERNAME` | `admin` | Admini fillestar |
+| `ADMIN_PASSWORD` | — (e detyrueshme) | Fjalëkalimi i adminit fillestar |
+| `BRIDGE_API_KEY` | (gjenerohet) | Çelësi API i urës; bosh = gjenerohet në nisjen e parë |
+| `SESSION_TTL_HOURS` | `12` | Kohëzgjatja e sesionit të adminit |
+| `OCC_THRESHOLD_CM` / `MAX_RANGE_CM` | `3` / `10` | Pragjet e klasifikimit (cm) |
+
+### 3b. Nisja pa Docker (zhvillim lokal)
 ```bash
 cd backend
 npm install
@@ -208,6 +238,15 @@ npm start
 > QR Code **nuk detekton veturën automatikisht**; ai identifikon vendin që skanohet. Detektimi i zënies bëhet nga sensorët.
 
 ## 🧪 Testimi
+
+Testet e automatizuara të backend-it (43 teste: autentikimi, sensorët, QR,
+rezervimet, SSE, qëndrueshmëria e databazës, kufizimi i login-it):
+
+```bash
+cd backend && npm test
+```
+
+Testet manuale të sistemit të plotë:
 
 | Testi | Rezultati i pritshëm |
 |---|---|

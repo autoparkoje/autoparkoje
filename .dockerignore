@@ -1,0 +1,16 @@
+# Mbaj imazhin të vogël dhe pa sekrete
+.git
+.gitignore
+.DS_Store
+**/node_modules
+**/.env
+backend/data
+backend/tests
+docs
+arduino
+*.md
+parkimi-intelegjent.html
+Kodi per prototipin e par per dy parkime.txt
+docker-compose.yml
+.dockerignore
+.env.example

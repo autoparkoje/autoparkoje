@@ -1,0 +1,38 @@
+# Sistemi Inteligjent i Parkimit — mjedisi Docker
+#
+# Nisja:   docker compose up -d --build
+# Ndalja:  docker compose down          (të dhënat RUHEN në volumin parking_data)
+# KUJDES:  "docker compose down -v" FSHIN databazën — mos e përdor në operim normal.
+#
+# Konfigurimi merret nga skedari .env në rrënjën e repo-s (shih .env.example).
+# Arkitektura: një shërbim i vetëm — backend-i Node shërben edhe frontend-in
+# statik dhe mban SQLite në volum. Ura e Arduino-s punon në shfletuesin e
+# operatorit (Web Serial), kështu që kontejneri s'ka nevojë për qasje USB.
+
+name: parkimi
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: parkimi-backend
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      PORT: 3000
+      DB_PATH: /data/parking.db
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      # E detyrueshme — vendose në .env (nuk ka vlerë default me qëllim)
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Vendos ADMIN_PASSWORD në skedarin .env (shih .env.example)}
+      BRIDGE_API_KEY: ${BRIDGE_API_KEY:-}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-12}
+      OCC_THRESHOLD_CM: ${OCC_THRESHOLD_CM:-3}
+      MAX_RANGE_CM: ${MAX_RANGE_CM:-10}
+    volumes:
+      - parking_data:/data
+
+volumes:
+  # Databaza SQLite — mbijeton restart/recreate të kontejnerëve
+  parking_data:

@@ -1,0 +1,17 @@
+# Varësitë
+node_modules/
+
+# Sekretet — KURRË në Git
+.env
+backend/.env
+
+# Databaza dhe skedarët e saj WAL (të dhëna lokale, jo kod)
+backend/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Sistemi operativ / editorët
+.DS_Store
+Thumbs.db
+*.log

@@ -14,15 +14,40 @@ const { logAction } = require("../services/audit");
 module.exports = function adminRoutes(db, config, hub) {
   const router = Router();
 
+  // Kufizues i përpjekjeve të dështuara të login-it (mbrojtje nga brute-force).
+  // Në memorie, për IP: pas MAX dështimeve brenda dritares kthehet 429.
+  const LOGIN_WINDOW_MS = 15 * 60_000;
+  const LOGIN_MAX_FAILS = 10;
+  const loginFails = new Map(); // ip → { count, first }
+  function loginBlocked(ip) {
+    const e = loginFails.get(ip);
+    if (!e) return false;
+    if (Date.now() - e.first > LOGIN_WINDOW_MS) { loginFails.delete(ip); return false; }
+    return e.count >= LOGIN_MAX_FAILS;
+  }
+  function recordLoginFail(ip) {
+    const e = loginFails.get(ip);
+    if (!e || Date.now() - e.first > LOGIN_WINDOW_MS) {
+      loginFails.set(ip, { count: 1, first: Date.now() });
+    } else {
+      e.count += 1;
+    }
+  }
+
   // POST /api/admin/login  { username, password } → { token, role, expires_at }
   router.post("/admin/login", (req, res) => {
+    if (loginBlocked(req.ip)) {
+      throw new HttpError(429, "Shumë përpjekje të dështuara — provo përsëri pas 15 minutash");
+    }
     const username = requireString((req.body || {}).username, "username", { max: 50 });
     const password = requireString(req.body.password, "password", { max: 200 });
     const user = db.prepare("SELECT * FROM admin_users WHERE username = ?").get(username);
     if (!user || !verifyPassword(password, user.password_hash)) {
+      recordLoginFail(req.ip);
       logAction(db, user ? user.id : null, "login_failed", { username });
       throw new HttpError(401, "Emri i përdoruesit ose fjalëkalimi është gabim");
     }
+    loginFails.delete(req.ip);
     const token = generateToken("at_");
     const expiresAt = new Date(Date.now() + config.sessionTtlHours * 3600_000).toISOString();
     db.prepare(
