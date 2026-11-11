@@ -41,9 +41,16 @@ const UI = (window.UI = {
   // Validimi i targës: 2-3 blloqe alfanumerike me vija ndarëse, p.sh. 01-234-AB
   validPlate: (p) => /^[A-Z0-9]{1,4}(-[A-Z0-9]{1,4}){1,2}$/.test(p),
 
-  // Baza e URL-ve në kodet QR. Konfigurohet te Admin → Cilësimet, që QR-të
-  // e printuara të mos përmbajnë "localhost" (telefonat s'e hapin dot).
-  qrBase: () => (localStorage.getItem("pi_public_url") || "").trim().replace(/\/+$/, "") || location.origin,
+  // Baza e URL-ve në kodet QR, me përparësi:
+  //   1) mbivendosja lokale (Admin → Cilësimet, localStorage)
+  //   2) PUBLIC_BASE_URL e serverit (merret nga /api/config në nisje)
+  //   3) adresa aktuale e shfletuesit (zhvillim lokal)
+  // Kështu QR-të e printuara nuk përmbajnë "localhost" (telefonat s'e hapin dot).
+  serverPublicUrl: "",
+  qrBase: () =>
+    (localStorage.getItem("pi_public_url") || "").trim().replace(/\/+$/, "") ||
+    UI.serverPublicUrl ||
+    location.origin,
 });
 UI.$("modal").addEventListener("click", (e) => { if (e.target.id === "modal") UI.closeModal(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") UI.closeModal(); });
@@ -654,4 +661,9 @@ SerialBridge.onModeChange = () => { UI.$("demoChip").hidden = !SerialBridge.isDe
 Theme.init();
 updateAdminButton();
 Live.connect();
+
+// Merr URL-në publike nga serveri (PUBLIC_BASE_URL) për kodet QR.
+API.config()
+  .then((c) => { UI.serverPublicUrl = (c?.public_base_url || "").replace(/\/+$/, ""); })
+  .catch(() => { /* zhvillim lokal pa konfigurim — përdoret location.origin */ });
 Router.go();

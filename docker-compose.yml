@@ -28,6 +28,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Vendos ADMIN_PASSWORD në skedarin .env (shih .env.example)}
       BRIDGE_API_KEY: ${BRIDGE_API_KEY:-}
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-12}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       OCC_THRESHOLD_CM: ${OCC_THRESHOLD_CM:-3}
       MAX_RANGE_CM: ${MAX_RANGE_CM:-10}
     volumes:

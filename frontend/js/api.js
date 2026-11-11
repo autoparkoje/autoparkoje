@@ -70,6 +70,7 @@ const API = (() => {
 
     // Publike / lexim
     health: () => get("/api/health"),
+    config: () => get("/api/config"),
     state: () => get("/api/state"),
     stats: (sector) => get(`/api/stats${sector ? `?sector=${encodeURIComponent(sector)}` : ""}`),
     spots: (params = {}) => get(`/api/spots?${new URLSearchParams(params)}`),

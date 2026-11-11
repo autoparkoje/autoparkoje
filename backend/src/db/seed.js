@@ -13,8 +13,10 @@ function seedAdmin(db, { username, password }) {
   if (!username || !password) {
     return { created: false, reason: "ADMIN_USERNAME / ADMIN_PASSWORD mungojnë në .env" };
   }
-  const exists = db.prepare("SELECT 1 FROM admin_users WHERE username = ?").get(username);
-  if (exists) return { created: false, reason: `admini "${username}" ekziston tashmë` };
+  // Kontrollohet nëse ekziston NDONJË llogari (jo vetëm me këtë emër) — përndryshe
+  // një .env i vjetëruar do të rikrijonte llogarinë e vjetër pas riemërimit të adminit.
+  const exists = db.prepare("SELECT username FROM admin_users LIMIT 1").get();
+  if (exists) return { created: false, reason: `ekziston tashmë një admin ("${exists.username}")` };
   db.prepare(
     "INSERT INTO admin_users (username, password_hash, role) VALUES (?, ?, 'admin')"
   ).run(username, hashPassword(password));

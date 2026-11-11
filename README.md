@@ -207,6 +207,7 @@ dhe seed-i (admini + çelësi API) ekzekutohen automatikisht në nisje dhe janë
 | `ADMIN_PASSWORD` | — (e detyrueshme) | Fjalëkalimi i adminit fillestar |
 | `BRIDGE_API_KEY` | (gjenerohet) | Çelësi API i urës; bosh = gjenerohet në nisjen e parë |
 | `SESSION_TTL_HOURS` | `12` | Kohëzgjatja e sesionit të adminit |
+| `PUBLIC_BASE_URL` | (bosh) | URL-ja publike në prodhim (p.sh. `https://autoparkoje.onrender.com`) — përdoret në kodet QR; bosh = adresa e shfletuesit |
 | `OCC_THRESHOLD_CM` / `MAX_RANGE_CM` | `3` / `10` | Pragjet e klasifikimit (cm) |
 
 ### 3b. Nisja pa Docker (zhvillim lokal)

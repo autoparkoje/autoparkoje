@@ -16,6 +16,10 @@ const config = {
   adminPassword: process.env.ADMIN_PASSWORD || "",
   bridgeApiKey: process.env.BRIDGE_API_KEY || "",
   sessionTtlHours: parseFloat(process.env.SESSION_TTL_HOURS || "12"),
+  // URL-ja publike e faqes (p.sh. https://autoparkoje.onrender.com) — përdoret
+  // në kodet QR që ato të hapen nga telefonat, jo "localhost". Bosh në zhvillim
+  // lokal: frontend-i atëherë përdor adresën aktuale të shfletuesit.
+  publicBaseUrl: (process.env.PUBLIC_BASE_URL || "").trim().replace(/\/+$/, ""),
   // Pragjet e klasifikimit të distancës (shih README: ≤3cm = e zënë, ≤10cm = e lirë)
   occThresholdCm: parseFloat(process.env.OCC_THRESHOLD_CM || "3"),
   maxRangeCm: parseFloat(process.env.MAX_RANGE_CM || "10"),

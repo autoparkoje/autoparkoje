@@ -38,6 +38,8 @@ function createApp({ db, config }) {
   app.get("/", (req, res) => res.sendFile(path.join(frontendDir, "index.html")));
 
   app.get("/api/health", (req, res) => res.json({ ok: true, uptime_s: Math.round(process.uptime()) }));
+  // Konfigurimi publik (pa sekrete) — frontend-i e merr URL-në bazë për QR.
+  app.get("/api/config", (req, res) => res.json({ public_base_url: config.publicBaseUrl || null }));
   app.get("/api/realtime", hub.handler());
   app.get("/api/openapi.json", (req, res) => res.json(openapi));
   app.get("/api/docs", (req, res) => res.type("html").send(SWAGGER_HTML));
@@ -45,7 +47,7 @@ function createApp({ db, config }) {
   app.use("/api", spotsRoutes(database, parking));
   app.use("/api", bridgeRoutes(database, parking, hub));
   app.use("/api", eventsRoutes(database));
-  app.use("/api", qrRoutes(database, hub));
+  app.use("/api", qrRoutes(database, config, hub));
   app.use("/api", visitorRoutes(database, parking, hub));
   app.use("/api", adminRoutes(database, config, hub));
 

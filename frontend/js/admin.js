@@ -624,7 +624,7 @@ const Admin = (window.Admin = {
               <input id="publicUrl" placeholder="p.sh. http://192.168.1.50:3000 ose https://parkimi.shembull.com"
                 value="${UI.esc(localStorage.getItem("pi_public_url") || "")}">
               <div class="hint">QR-të e printuara duhet të hapen nga telefonat — mos lër "localhost".
-                Bosh = përdoret adresa aktuale e shfletuesit.</div>
+                Bosh = përdoret PUBLIC_BASE_URL e serverit${UI.serverPublicUrl ? ` (<b>${UI.esc(UI.serverPublicUrl)}</b>)` : ""}, ose adresa aktuale e shfletuesit.</div>
             </div>
           </div>
           <div class="card card-pad">

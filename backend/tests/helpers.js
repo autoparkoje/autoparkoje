@@ -16,11 +16,11 @@ const TEST_CONFIG = {
 
 const ADMIN = { username: "admin-test", password: "fjalekalim-i-forte" };
 
-async function startTestServer() {
+async function startTestServer(configOverrides = {}) {
   const db = createDb(":memory:");
   seedAdmin(db, ADMIN);
   const bridge = seedBridgeKey(db);
-  const app = createApp({ db, config: TEST_CONFIG });
+  const app = createApp({ db, config: { ...TEST_CONFIG, ...configOverrides } });
   const server = await new Promise((resolve) => {
     const s = app.listen(0, () => resolve(s));
   });
