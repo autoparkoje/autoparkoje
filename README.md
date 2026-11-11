@@ -106,6 +106,12 @@ flowchart LR
 
 ## 📍 Skema e pinave
 
+> 🔌 **Konfigurimi aktual (6 vende + sensor hyrjeje + servo barriera)** dokumentohet
+> i plotë — bashkë me analizën e ushqimit elektrik dhe protokollin serial JSON —
+> te [`docs/HARDWARE.md`](docs/HARDWARE.md). Firmware:
+> [`arduino/parkimi-7-sensore/`](arduino/parkimi-7-sensore/). Tabela më poshtë
+> është plani origjinal me 8 vende dhe ruhet për referencë.
+
 | Vendi | TRIG | ECHO |
 |:---:|:---:|:---:|
 | P1 | D2 | D3 |
@@ -164,8 +170,8 @@ Parametrat fillestarë për testim:
 
 ### 1. Klono repo-n
 ```bash
-git clone https://github.com/<organizata-ose-perdoruesi>/<emri-i-repo-s>.git
-cd <emri-i-repo-s>
+git clone git@github.com:Projekti-Sistemi-i-parkimit/Projketi-Sistemi-i-parkimit.git>
+cd <Projketi-Sistemi-i-parkimit>
 ```
 
 ### 2. Ngarko kodin në Arduino
@@ -177,12 +183,17 @@ cd <emri-i-repo-s>
 ```bash
 cd backend
 npm install
+cp .env.example .env      # vendos ADMIN_PASSWORD etj.
+npm run seed              # krijon adminin + çelësin API të urës (shfaqet vetëm një herë)
 npm start
 ```
 
 ### 4. Hap dashboard-in
-- Hap `frontend/index.html` ose adresën e backend-it (p.sh. `http://localhost:3000`).
-- Shtyp **“Lidh Arduino”** dhe zgjidh portën serial (Web Serial).
+- Hap `http://localhost:3000` — frontend-i (dosja `frontend/`) shërbehet nga backend-i.
+- Dokumentimi i API-së: `http://localhost:3000/api/docs`
+- Hyrja e administratorit: butoni **“Hyrja Admin”** lart djathtas.
+- Lidhja me Arduino: paneli admin → **“Lidhja Arduino”** → *Lidh USB* (Web Serial, kërkon Chrome/Edge/Brave) dhe vendos çelësin API të urës.
+- Dy tema: **White Glass** (default) dhe **Black Parking** — ndërrohen nga navigimi dhe ruhen në shfletues.
 
 > Për qasje nga pajisje të tjera (p.sh. telefona që skanojnë QR) aplikacioni duhet të jetë i hostuar online ose në të njëjtin rrjet lokal.
 
