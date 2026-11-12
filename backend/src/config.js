@@ -25,6 +25,8 @@ const config = {
   // Pragjet e klasifikimit të distancës (shih README: ≤3cm = e zënë, ≤10cm = e lirë)
   occThresholdCm: parseFloat(process.env.OCC_THRESHOLD_CM || "3"),
   maxRangeCm: parseFloat(process.env.MAX_RANGE_CM || "10"),
+  // Pas sa sekondash heshtjeje të Arduino-s vendet me sensor shënohen OFFLINE
+  sensorOfflineS: parseFloat(process.env.SENSOR_OFFLINE_S || "45"),
 };
 
 // Validimi i kredencialeve të adminit nga environment-i — i NJËJTI mekanizëm

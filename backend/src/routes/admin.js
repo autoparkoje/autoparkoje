@@ -12,7 +12,7 @@ const { logAction } = require("../services/audit");
 // Rrugët administrative (M3): hyrja/dalja, menaxhimi i përdoruesve dhe
 // çelësave API, dhe leximi i audit log-ut. Të gjitha përveç login-it
 // kërkojnë Bearer token; veprimet e ndjeshme kërkojnë rolin "admin" (RBAC).
-module.exports = function adminRoutes(db, config, hub, adminAuth) {
+module.exports = function adminRoutes(db, config, hub, adminAuth, parking) {
   const router = Router();
 
   // Kufizues i përpjekjeve të dështuara të login-it (mbrojtje nga brute-force).
@@ -150,6 +150,19 @@ module.exports = function adminRoutes(db, config, hub, adminAuth) {
       hub.broadcast("barrier_update", { status, reason }, "barrier");
     }
     res.json({ ok: true, status, changed: current.status !== status });
+  });
+
+  // POST /api/admin/spots/:key/status  { status: "free"|"occupied" }
+  // Menaxhimi manual i vendeve (admin + operator): statusi i sektorëve ONLINE
+  // B/C vendoset nga paneli; Sektori A mbetet i kontrollueshëm për demonstrime
+  // (por sensori/sweeper-i mund ta mbishkruajë kur Arduino flet ose hesht).
+  router.post("/spots/:key/status", auth, (req, res) => {
+    const status = requireEnum((req.body || {}).status, "status", ["free", "occupied"]);
+    const spot = db.prepare("SELECT spot_key, has_sensor FROM spots WHERE spot_key = ?").get(req.params.key);
+    if (!spot) throw new HttpError(404, `Vendi "${req.params.key}" nuk ekziston`);
+    const changes = parking.ingest([{ key: spot.spot_key, status }], { recordReadings: false });
+    logAction(db, req.admin.id, "spot_status_set", { key: spot.spot_key, status });
+    res.json({ ok: true, key: spot.spot_key, status, changed: changes.length > 0 });
   });
 
   // GET /api/admin/audit-log?page=1&limit=50

@@ -233,9 +233,13 @@ const Admin = (window.Admin = {
                 <td>${UI.esc(s.sector)}</td>
                 <td>${UI.badge(s.status)}</td>
                 <td>${s.distance_cm != null ? s.distance_cm.toFixed(1) + " cm" : "—"}</td>
-                <td>${s.has_sensor ? "📡 Po" : "—"}</td>
+                <td>${s.has_sensor ? "📡 Arduino" : "🌐 Online"}</td>
                 <td class="muted small">${UI.fmtDt(s.updated_at)}</td>
-                <td><button class="btn btn-sm" data-detail="${s.spot_key}">Detajet</button></td>
+                <td style="white-space:nowrap">
+                  <button class="btn btn-sm" data-detail="${s.spot_key}">Detajet</button>
+                  ${s.status !== "free" ? `<button class="btn btn-sm btn-success" data-setstatus="${s.spot_key}|free" title="Shëno të lirë">Liro</button>` : ""}
+                  ${s.status !== "occupied" ? `<button class="btn btn-sm btn-danger" data-setstatus="${s.spot_key}|occupied" title="Shëno të zënë">Zëre</button>` : ""}
+                </td>
               </tr>`).join("") || `<tr><td colspan="7" class="tbl-empty">Asnjë vend nuk përputhet me filtrat.</td></tr>`}</tbody>
           </table></div>
           <div class="pager">
@@ -259,6 +263,19 @@ const Admin = (window.Admin = {
       UI.$("pgPrev").onclick = () => Admin.sections.spots.call(Admin, c, r.page - 1);
       UI.$("pgNext").onclick = () => Admin.sections.spots.call(Admin, c, r.page + 1);
       c.querySelectorAll("[data-detail]").forEach((b) => (b.onclick = () => Admin.spotDetail(b.dataset.detail)));
+      // Statusi manual (sektorët online; Sektori A i mundur për demonstrime)
+      c.querySelectorAll("[data-setstatus]").forEach((b) => (b.onclick = async () => {
+        const [key, status] = b.dataset.setstatus.split("|");
+        b.disabled = true;
+        try {
+          await API.adminSetSpotStatus(key, status);
+          UI.toast(`${key} u shënua ${status === "free" ? "i lirë" : "i zënë"}`, "ok");
+          Admin.sections.spots.call(Admin, c, r.page);
+        } catch (err) {
+          UI.toast(err.message, "error");
+          b.disabled = false;
+        }
+      }));
     },
 
     /* === Vizitorët (qëndrimet) === */

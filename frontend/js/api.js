@@ -119,5 +119,6 @@ const API = (() => {
     adminRevokeApiKey: (id) => del(`/api/admin/api-keys/${id}`, { auth: "admin" }),
     adminAudit: (params = {}) => get(`/api/admin/audit-log?${new URLSearchParams(params)}`, { auth: "admin" }),
     adminBarrier: (status, reason) => post("/api/admin/barrier", { status, reason }, { auth: "admin" }),
+    adminSetSpotStatus: (key, status) => post(`/api/admin/spots/${encodeURIComponent(key)}/status`, { status }, { auth: "admin" }),
   };
 })();

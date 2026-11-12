@@ -66,7 +66,7 @@ function createApp({ db, config }) {
   app.use("/api", eventsRoutes(database));
   app.use("/api", qrRoutes(database, config, hub));
   app.use("/api", visitorRoutes(database, parking, hub));
-  app.use("/api", adminRoutes(database, config, hub, adminAuth));
+  app.use("/api", adminRoutes(database, config, hub, adminAuth, parking));
 
   app.use(notFound);
   app.use(errorHandler);

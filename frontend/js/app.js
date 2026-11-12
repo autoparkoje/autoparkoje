@@ -72,11 +72,16 @@ const Theme = {
   },
 };
 
-/* ---------- Të dhënat e sektorëve (metadata e maketës) ---------- */
+/* ---------- Arkitektura hibride e sektorëve ----------
+   A: prototip FIZIK me Arduino/sensorë — vetëm demonstrime, s'rezervohet online.
+   B/C: parking ONLINE — rezervime nga çdo pajisje, pa varësi nga hardueri. */
 const SECTOR_META = {
-  A: { name: "Sektori A", floor: "Kati B1", live: true },
-  B: { name: "Sektori B", floor: "Kati B2", live: false },
-  C: { name: "Sektori C", floor: "Parkingu i jashtëm", live: false },
+  A: { name: "Sektori A", floor: "Kati B1", live: true, online: false,
+       label: "Prototip fizik – Arduino IoT", badge: "Demo fizike" },
+  B: { name: "Sektori B", floor: "Kati B2", live: false, online: true,
+       label: "Parking Online", badge: "Rezervime online" },
+  C: { name: "Sektori C", floor: "Parkingu i jashtëm", live: false, online: true,
+       label: "Parking Online", badge: "Rezervime online" },
 };
 
 /* ---------- Cache i të dhënave nga backend-i ---------- */
@@ -285,14 +290,18 @@ const Views = {
       <div class="sector-tabs">
         ${Object.entries(SECTOR_META).map(([sec, m]) => `
           <button class="sector-tab ${sec === k ? "on" : ""}" data-sector="${sec}">
-            <div><b>${m.name}</b><small>${m.floor} · ${(Data.sectors[sec] || []).length} vende</small>
-            ${m.live ? `<div class="live-tag">● SENSORË LIVE</div>` : ""}</div>
+            <div><b>${m.name}</b><small>${m.label} · ${(Data.sectors[sec] || []).length} vende</small>
+            <div class="live-tag ${m.online ? "online" : "demo"}">● ${m.badge.toUpperCase()}</div></div>
             <div class="n">${freeCount(sec)}</div>
           </button>`).join("")}
       </div>
       <div class="map-grid">
         <section class="card">
-          <div class="card-bar"><h2>${UI.esc(meta.name)}<small>${UI.esc(meta.floor)}</small></h2></div>
+          <div class="card-bar">
+            <h2>${UI.esc(meta.name)}<small>${UI.esc(meta.label)} · ${UI.esc(meta.floor)}</small></h2>
+            ${k === "A" ? `<span class="badge unknown" id="arduinoChip">Arduino: …</span>`
+                        : `<span class="badge free">${UI.esc(meta.badge)}</span>`}
+          </div>
           <div class="lot" style="--cols:${Math.max(top.length, bottom.length || 1)}">
             ${top.length ? `<div class="lot-row top" style="grid-template-columns:repeat(${top.length},1fr)">${top.map((s) => this.slotHtml(s)).join("")}</div>` : ""}
             <div class="lot-lane"><div class="lane-entry">HYRJA →</div><span class="lane-arrow">➜</span><span class="lane-arrow">➜</span><span class="lane-arrow">➜</span></div>
@@ -307,6 +316,18 @@ const Views = {
 
     v.querySelectorAll("[data-sector]").forEach((b) => (b.onclick = () => { this.activeSector = b.dataset.sector; this.map(v); }));
     v.querySelectorAll("[data-spot]").forEach((b) => (b.onclick = () => this.openSpot(b.dataset.spot)));
+
+    // Sektori A: statusi i lidhjes me Arduino-n (nga matja e fundit e sensorëve)
+    if (k === "A") {
+      API.sensors().then((r) => {
+        const chip = document.getElementById("arduinoChip");
+        if (!chip) return;
+        const newest = Math.max(0, ...r.data.map((s) => s.last_reading_at ? Date.parse(s.last_reading_at + "Z") : 0));
+        const liveNow = newest && Date.now() - newest < 60_000 && r.data.some((s) => s.sensor_ok);
+        chip.className = `badge ${liveNow ? "free" : "unknown"}`;
+        chip.textContent = liveNow ? "Arduino: LIVE" : "Arduino: offline — pa sinjal";
+      }).catch(() => { /* paneli mbetet siç është */ });
+    }
   },
 
   slotHtml(s) {
@@ -363,7 +384,8 @@ const Views = {
         </div>
       </div>
       <div class="mt" style="display:flex;gap:10px;flex-wrap:wrap">
-        ${st === "free" ? `<a class="btn btn-primary" href="#/reserve?key=${encodeURIComponent(key)}" onclick="UI.closeModal()">Rezervo këtë vend</a>` : ""}
+        ${st === "free" && SECTOR_META[key.split("-")[0]]?.online ? `<a class="btn btn-primary" href="#/reserve?key=${encodeURIComponent(key)}" onclick="UI.closeModal()">Rezervo këtë vend</a>` : ""}
+        ${key.startsWith("A-") ? `<p class="muted small mt">Prototip fizik (Arduino) — vetëm për demonstrime; rezervimet bëhen në sektorët B dhe C.</p>` : ""}
         ${mine ? `<button class="btn btn-danger" id="mCancelRes">Anulo rezervimin tim</button>` : ""}
         <button class="btn btn-ghost" onclick="UI.closeModal()">Mbyll</button>
       </div>`);
@@ -433,7 +455,8 @@ const Views = {
     }
 
     const myRes = Data.state.res.find((r) => r.plate === visitor.plate);
-    const freeSpots = Object.keys(SECTOR_META).flatMap((k) =>
+    // Rezervohen vetëm sektorët ONLINE (B/C) — Sektori A është demo fizike.
+    const freeSpots = Object.keys(SECTOR_META).filter((k) => SECTOR_META[k].online).flatMap((k) =>
       (Data.sectors[k] || []).filter((s) => Data.displayStatus(s.spot_key) === "free")
     );
     const defTime = UI.hm(Date.now() + 3600_000);
