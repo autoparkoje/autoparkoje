@@ -212,12 +212,21 @@ dhe seed-i (admini + çelësi API) ekzekutohen automatikisht në nisje dhe janë
 
 ### 3b. Nisja pa Docker (zhvillim lokal)
 ```bash
+cp .env.example .env      # NË RRËNJË të repo-s — burimi i vetëm i konfigurimit
 cd backend
 npm install
-cp .env.example .env      # vendos ADMIN_PASSWORD etj.
-npm run seed              # krijon adminin + çelësin API të urës (shfaqet vetëm një herë)
+npm run seed              # gjeneron çelësin API të urës (shfaqet vetëm një herë)
 npm start
 ```
+Kredencialet e adminit lexohen VETËM nga environment-i (`ADMIN_USERNAME` /
+`ADMIN_PASSWORD` në `.env` e rrënjës lokalisht, ose Render → Environment në prodhim).
+
+### 3c. Monitorimi lokal (opsional — Prometheus + Grafana)
+```bash
+docker compose --profile monitoring up -d
+```
+Prometheus: `http://localhost:9090` · Grafana: `http://localhost:3001` (vetëm
+në 127.0.0.1, nuk deployohen në Render). Detajet: [`devops/README.md`](devops/README.md).
 
 ### 4. Hap dashboard-in
 - Hap `http://localhost:3000` — frontend-i (dosja `frontend/`) shërbehet nga backend-i.

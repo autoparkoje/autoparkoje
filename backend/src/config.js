@@ -3,8 +3,10 @@
 const path = require("path");
 const fs = require("fs");
 
-// Ngarkon .env nëse ekziston (Node 20.12+ e ka të integruar).
-const envFile = path.join(__dirname, "..", ".env");
+// Burimi i VETËM i konfigurimit: .env në rrënjën e repo-s (Node 20.12+ e ka
+// të integruar; nuk mbishkruan variablat e vendosura tashmë në environment).
+// Docker Compose dhe Render i japin variablat direkt — .env është për zhvillim lokal.
+const envFile = path.join(__dirname, "..", "..", ".env");
 if (fs.existsSync(envFile)) {
   process.loadEnvFile(envFile);
 }

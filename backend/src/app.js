@@ -5,6 +5,7 @@ const express = require("express");
 const { createDb } = require("./db");
 const { ensureEnvAdmin } = require("./db/seed");
 const { adminAuthStatus } = require("./config");
+const { createMetrics } = require("./metrics");
 const { createParkingService } = require("./services/parking");
 const { SseHub } = require("./realtime/sse");
 const { notFound, errorHandler } = require("./middleware/errors");
@@ -40,6 +41,11 @@ function createApp({ db, config }) {
   } else {
     console.error(`⚠ Hyrja e adminit është e ÇAKTIVIZUAR: ${adminAuth.reason}`);
   }
+
+  // Metrikat Prometheus (numërues anonimë; dështimi i tyre s'prek aplikacionin)
+  const metrics = createMetrics(database);
+  app.use(metrics.middleware);
+  app.get("/metrics", metrics.handler());
 
   app.use(express.json({ limit: "256kb" }));
 
