@@ -3,7 +3,8 @@
 const { Router } = require("express");
 const { HttpError } = require("../middleware/errors");
 const { requireAdmin, requireRole } = require("../middleware/auth");
-const { verifyPassword, hashPassword } = require("../lib/passwords");
+const { safeEqual } = require("../lib/passwords");
+const { ensureEnvAdmin } = require("../db/seed");
 const { generateToken, hashToken } = require("../lib/tokens");
 const { requireString, requireEnum, pagination, paginated } = require("../lib/validate");
 const { logAction } = require("../services/audit");
@@ -11,7 +12,7 @@ const { logAction } = require("../services/audit");
 // Rrugët administrative (M3): hyrja/dalja, menaxhimi i përdoruesve dhe
 // çelësave API, dhe leximi i audit log-ut. Të gjitha përveç login-it
 // kërkojnë Bearer token; veprimet e ndjeshme kërkojnë rolin "admin" (RBAC).
-module.exports = function adminRoutes(db, config, hub) {
+module.exports = function adminRoutes(db, config, hub, adminAuth) {
   const router = Router();
 
   // Kufizues i përpjekjeve të dështuara të login-it (mbrojtje nga brute-force).
@@ -35,19 +36,28 @@ module.exports = function adminRoutes(db, config, hub) {
   }
 
   // POST /api/admin/login  { username, password } → { token, role, expires_at }
+  // Kredencialet verifikohen VETËM kundrejt Environment Variables
+  // (ADMIN_USERNAME / ADMIN_PASSWORD), me krahasim timing-safe.
+  // Databaza nuk është burim kredencialesh — mban vetëm identitetin për sesionin.
   router.post("/admin/login", (req, res) => {
     if (loginBlocked(req.ip)) {
       throw new HttpError(429, "Shumë përpjekje të dështuara — provo përsëri pas 15 minutash");
     }
+    if (!adminAuth || !adminAuth.enabled) {
+      throw new HttpError(503, "Hyrja e adminit nuk është e konfiguruar në server — kontakto administratorin e sistemit");
+    }
     const username = requireString((req.body || {}).username, "username", { max: 50 });
     const password = requireString(req.body.password, "password", { max: 200 });
-    const user = db.prepare("SELECT * FROM admin_users WHERE username = ?").get(username);
-    if (!user || !verifyPassword(password, user.password_hash)) {
+    // Të dyja krahasimet kryhen gjithmonë (pa short-circuit të hershëm)
+    const okUser = safeEqual(username, config.adminUsername);
+    const okPass = safeEqual(password, config.adminPassword);
+    if (!okUser || !okPass) {
       recordLoginFail(req.ip);
-      logAction(db, user ? user.id : null, "login_failed", { username });
+      logAction(db, null, "login_failed", { username });
       throw new HttpError(401, "Emri i përdoruesit ose fjalëkalimi është gabim");
     }
     loginFails.delete(req.ip);
+    const user = { ...ensureEnvAdmin(db, config.adminUsername), role: "admin" };
     const token = generateToken("at_");
     const expiresAt = new Date(Date.now() + config.sessionTtlHours * 3600_000).toISOString();
     db.prepare(
@@ -80,19 +90,14 @@ module.exports = function adminRoutes(db, config, hub) {
     res.json({ data: rows });
   });
 
-  // POST /api/admin/users  { username, password, role } (vetëm roli admin)
-  router.post("/admin/users", auth, requireRole("admin"), (req, res) => {
-    const username = requireString((req.body || {}).username, "username", { max: 50 });
-    const password = requireString(req.body.password, "password", { max: 200, min: 8 });
-    const role = requireEnum(req.body.role || "operator", "role", ["admin", "operator"]);
-    if (db.prepare("SELECT 1 FROM admin_users WHERE username = ?").get(username)) {
-      throw new HttpError(409, `Përdoruesi "${username}" ekziston tashmë`);
-    }
-    const info = db
-      .prepare("INSERT INTO admin_users (username, password_hash, role) VALUES (?, ?, ?)")
-      .run(username, hashPassword(password), role);
-    logAction(db, req.admin.id, "user_created", { username, role });
-    res.status(201).json({ id: info.lastInsertRowid, username, role });
+  // POST /api/admin/users — HEQUR: kredencialet nuk ruhen më në databazë.
+  // Llogaria e adminit menaxhohet vetëm me ADMIN_USERNAME / ADMIN_PASSWORD
+  // në environment (lokalisht .env, Docker Compose, Render Environment).
+  router.post("/admin/users", auth, requireRole("admin"), () => {
+    throw new HttpError(
+      410,
+      "Llogaritë nuk krijohen më nga paneli — kredencialet menaxhohen me Environment Variables (ADMIN_USERNAME / ADMIN_PASSWORD)"
+    );
   });
 
   // GET /api/admin/api-keys (vetëm roli admin) — kurrë nuk kthen hash-et

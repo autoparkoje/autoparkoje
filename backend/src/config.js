@@ -25,4 +25,31 @@ const config = {
   maxRangeCm: parseFloat(process.env.MAX_RANGE_CM || "10"),
 };
 
+// Validimi i kredencialeve të adminit nga environment-i — i NJËJTI mekanizëm
+// lokalisht, në Docker dhe në Render (process.env). Placeholder-ët refuzohen
+// GJITHMONË; pa variabla të vlefshme, autentikimi i adminit çaktivizohet.
+const PLACEHOLDER_PASSWORDS = new Set([
+  "ndrysho-kete-fjalekalim",
+  "ndrysho-ketë-password",
+  "ndrysho-kete-password",
+  "changeme",
+  "password",
+  "admin",
+  "12345678",
+]);
+
+function adminAuthStatus(username, password) {
+  if (!username || !password) {
+    return { enabled: false, reason: "ADMIN_USERNAME / ADMIN_PASSWORD mungojnë në environment" };
+  }
+  if (PLACEHOLDER_PASSWORDS.has(String(password).trim().toLowerCase())) {
+    return { enabled: false, reason: "ADMIN_PASSWORD është placeholder — vendos një fjalëkalim real" };
+  }
+  if (String(password).length < 8) {
+    return { enabled: false, reason: "ADMIN_PASSWORD është shumë i shkurtër (min. 8 karaktere)" };
+  }
+  return { enabled: true, reason: null };
+}
+
 module.exports = config;
+module.exports.adminAuthStatus = adminAuthStatus;

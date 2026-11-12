@@ -488,8 +488,7 @@ const Admin = (window.Admin = {
     async users(c) {
       const r = await API.adminUsers();
       c.innerHTML = `
-        <div class="page-head"><div><h1>Përdoruesit</h1><p>Administratorët dhe operatorët e sistemit.</p></div>
-          <button class="btn btn-primary" id="newUser">+ Përdorues i ri</button></div>
+        <div class="page-head"><div><h1>Përdoruesit</h1><p>Llogaria e administratorit menaxhohet me Environment Variables (ADMIN_USERNAME / ADMIN_PASSWORD) — jo nga paneli.</p></div></div>
         <div class="card">
           <div class="table-wrap"><table class="tbl">
             <thead><tr><th>ID</th><th>Përdoruesi</th><th>Roli</th><th>Hyrja e fundit</th><th>Krijuar</th></tr></thead>
@@ -499,30 +498,8 @@ const Admin = (window.Admin = {
               <td class="muted small">${UI.fmtDt(u.last_login)}</td>
               <td class="muted small">${UI.fmtDt(u.created_at)}</td></tr>`).join("")}</tbody>
           </table></div>
-        </div>`;
-      UI.$("newUser").onclick = () => {
-        UI.modal(`
-          <h3>Përdorues i ri</h3>
-          <p class="m-sub">Fjalëkalimi duhet të ketë së paku 8 karaktere.</p>
-          <div id="nuAlert"></div>
-          <form id="nuForm">
-            <div class="field"><label for="nuUser">Emri i përdoruesit</label><input id="nuUser" required maxlength="50"></div>
-            <div class="field"><label for="nuPass">Fjalëkalimi</label><input id="nuPass" type="password" required minlength="8"></div>
-            <div class="field"><label for="nuRole">Roli</label>
-              <select id="nuRole"><option value="operator">operator — qasje bazë</option><option value="admin">admin — qasje e plotë</option></select></div>
-            <button class="btn btn-primary btn-block" type="submit">Krijo</button>
-          </form>`);
-        UI.$("nuForm").onsubmit = async (e) => {
-          e.preventDefault();
-          try {
-            await API.adminCreateUser({ username: UI.$("nuUser").value.trim(), password: UI.$("nuPass").value, role: UI.$("nuRole").value });
-            UI.closeModal(); UI.toast("Përdoruesi u krijua", "ok");
-            Admin.sections.users.call(Admin, c);
-          } catch (err) {
-            UI.$("nuAlert").innerHTML = `<div class="alert error">${UI.esc(err.message)}</div>`;
-          }
-        };
-      };
+        </div>
+        <p class="muted small mt">Për të ndryshuar kredencialet: përditëso variablat në .env (lokalisht / Docker) ose në Render → Environment, pastaj rinis shërbimin.</p>`;
     },
 
     /* === Çelësat API (vetëm admin) === */

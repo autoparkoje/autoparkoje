@@ -5,7 +5,7 @@
 
 const { createApp } = require("../src/app");
 const { createDb } = require("../src/db");
-const { seedAdmin, seedBridgeKey } = require("../src/db/seed");
+const { seedBridgeKey } = require("../src/db/seed");
 
 const TEST_CONFIG = {
   dbPath: ":memory:",
@@ -18,9 +18,18 @@ const ADMIN = { username: "admin-test", password: "fjalekalim-i-forte" };
 
 async function startTestServer(configOverrides = {}) {
   const db = createDb(":memory:");
-  seedAdmin(db, ADMIN);
   const bridge = seedBridgeKey(db);
-  const app = createApp({ db, config: { ...TEST_CONFIG, ...configOverrides } });
+  // Kredencialet e adminit jepen përmes config-ut (si nga environment-i) —
+  // databaza nuk është burim kredencialesh.
+  const app = createApp({
+    db,
+    config: {
+      ...TEST_CONFIG,
+      adminUsername: ADMIN.username,
+      adminPassword: ADMIN.password,
+      ...configOverrides,
+    },
+  });
   const server = await new Promise((resolve) => {
     const s = app.listen(0, () => resolve(s));
   });

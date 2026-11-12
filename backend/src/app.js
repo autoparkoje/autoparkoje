@@ -3,6 +3,8 @@
 const path = require("path");
 const express = require("express");
 const { createDb } = require("./db");
+const { ensureEnvAdmin } = require("./db/seed");
+const { adminAuthStatus } = require("./config");
 const { createParkingService } = require("./services/parking");
 const { SseHub } = require("./realtime/sse");
 const { notFound, errorHandler } = require("./middleware/errors");
@@ -30,6 +32,15 @@ function createApp({ db, config }) {
   const hub = new SseHub();
   const parking = createParkingService(database, config, hub);
 
+  // Autentikimi i adminit: kredencialet vijnë VETËM nga environment-i.
+  // Pa variabla të vlefshme, hyrja çaktivizohet me gabim të qartë (pa sekrete).
+  const adminAuth = adminAuthStatus(config.adminUsername, config.adminPassword);
+  if (adminAuth.enabled) {
+    ensureEnvAdmin(database, config.adminUsername);
+  } else {
+    console.error(`⚠ Hyrja e adminit është e ÇAKTIVIZUAR: ${adminAuth.reason}`);
+  }
+
   app.use(express.json({ limit: "256kb" }));
 
   // Frontend-i shërbehet nga dosja frontend/ (prototipi i vjetër mbetet në rrënjë).
@@ -49,7 +60,7 @@ function createApp({ db, config }) {
   app.use("/api", eventsRoutes(database));
   app.use("/api", qrRoutes(database, config, hub));
   app.use("/api", visitorRoutes(database, parking, hub));
-  app.use("/api", adminRoutes(database, config, hub));
+  app.use("/api", adminRoutes(database, config, hub, adminAuth));
 
   app.use(notFound);
   app.use(errorHandler);

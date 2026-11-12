@@ -54,6 +54,8 @@ const UI = (window.UI = {
 });
 UI.$("modal").addEventListener("click", (e) => { if (e.target.id === "modal") UI.closeModal(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") UI.closeModal(); });
+// Ndërrimi i faqes (hash) e mbyll modalin — të mos mbetet i hapur mbi faqen e re
+window.addEventListener("hashchange", () => UI.closeModal());
 
 /* ---------- Tema ---------- */
 const Theme = {
@@ -291,7 +293,7 @@ const Views = {
       <div class="map-grid">
         <section class="card">
           <div class="card-bar"><h2>${UI.esc(meta.name)}<small>${UI.esc(meta.floor)}</small></h2></div>
-          <div class="lot">
+          <div class="lot" style="--cols:${Math.max(top.length, bottom.length || 1)}">
             ${top.length ? `<div class="lot-row top" style="grid-template-columns:repeat(${top.length},1fr)">${top.map((s) => this.slotHtml(s)).join("")}</div>` : ""}
             <div class="lot-lane"><div class="lane-entry">HYRJA →</div><span class="lane-arrow">➜</span><span class="lane-arrow">➜</span><span class="lane-arrow">➜</span></div>
             <div class="lot-row bottom" style="grid-template-columns:repeat(${bottom.length || 1},1fr)">${bottom.map((s) => this.slotHtml(s)).join("")}</div>
@@ -614,7 +616,7 @@ const Views = {
             <h3>Parkova — regjistro vendin</h3>
             <p class="muted small" style="margin-bottom:10px">Skano QR-in e vendit, ose shkruaje kodin e tij (p.sh. A-P1):</p>
             <form id="scanForm" style="display:flex;gap:10px">
-              <input id="scanCode" placeholder="A-P1" maxlength="12" style="flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);text-transform:uppercase">
+              <input id="scanCode" placeholder="A-P1" maxlength="12" aria-label="Kodi i vendit të parkimit" style="flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);text-transform:uppercase">
               <button class="btn btn-primary" type="submit">Regjistro</button>
             </form>
             <div id="scanAlert" class="mt"></div>
@@ -646,7 +648,17 @@ UI.$("btnAdmin").onclick = () => {
   if (API.store.admin) location.hash = "#/admin";
   else Admin.openLogin();
 };
-UI.$("hamburger").onclick = () => UI.$("navLinks").classList.toggle("open");
+UI.$("hamburger").onclick = () => {
+  const open = UI.$("navLinks").classList.toggle("open");
+  UI.$("hamburger").setAttribute("aria-expanded", String(open));
+};
+// Në telefon: menyja mbyllet sapo zgjidhet një lidhje
+UI.$("navLinks").addEventListener("click", (e) => {
+  if (e.target.closest("a")) {
+    UI.$("navLinks").classList.remove("open");
+    UI.$("hamburger").setAttribute("aria-expanded", "false");
+  }
+});
 
 document.addEventListener("admin:expired", () => {
   updateAdminButton();

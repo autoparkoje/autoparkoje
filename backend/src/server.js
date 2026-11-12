@@ -6,9 +6,9 @@ const { bootstrap } = require("./db/seed");
 
 const app = createApp({ config });
 
-// Seed-i në nisje (idempotent): siguron që admini fillestar ekziston edhe kur
-// databaza është krijuar rishtas (p.sh. deploy në Render pa disk të qëndrueshëm),
-// ku "npm run seed" nuk ekzekutohet kurrë. Nuk shkruan asnjë sekret në logje.
+// Regjistron çelësin API të urës nga env nëse jepet (idempotent, pa sekrete
+// në logje). Kredencialet e adminit NUK ruhen në databazë — verifikohen në
+// kohë hyrjeje kundrejt ADMIN_USERNAME / ADMIN_PASSWORD nga environment-i.
 bootstrap(app.locals.db, config);
 
 const server = app.listen(config.port, () => {

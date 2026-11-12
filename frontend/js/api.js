@@ -114,7 +114,6 @@ const API = (() => {
     },
     adminMe: () => get("/api/admin/me", { auth: "admin" }),
     adminUsers: () => get("/api/admin/users", { auth: "admin" }),
-    adminCreateUser: (u) => post("/api/admin/users", u, { auth: "admin" }),
     adminApiKeys: () => get("/api/admin/api-keys", { auth: "admin" }),
     adminCreateApiKey: (body) => post("/api/admin/api-keys", body, { auth: "admin" }),
     adminRevokeApiKey: (id) => del(`/api/admin/api-keys/${id}`, { auth: "admin" }),
